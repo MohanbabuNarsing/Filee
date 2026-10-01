@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java Fullstack Suite (Spring Boot 3.2 + React)</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              900: '#14532d',
+            },
+            java: {
+              orange: '#e66f00',
+              blue: '#007396',
+            }
+          },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="h-full bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
+
+  <div id="root" class="h-full flex flex-col"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const initialTasks = [
+      { id: 101, title: 'Configure Spring Security OAuth2 JWT', category: 'Backend', priority: 'HIGH', status: 'IN_PROGRESS', assignee: 'Dev Team', estimatedHours: 8, createdAt: '2026-09-28' },
+      { id: 102, title: 'Implement React Query Cache Invalidation', category: 'Frontend', priority: 'MEDIUM', status: 'COMPLETED', assignee: 'UI Architect', estimatedHours: 4, createdAt: '2026-09-29' },
+      { id: 103, title: 'Optimize Hibernate JPA Fetch Join Query', category: 'Database', priority: 'HIGH', status: 'IN_PROGRESS', assignee: 'DBA Lead', estimatedHours: 6, createdAt: '2026-09-30' },
+      { id: 104, title: 'Set up Docker Multi-stage Build Workflow', category: 'DevOps', priority: 'LOW', status: 'PENDING', assignee: 'DevOps Lead', estimatedHours: 3, createdAt: '2026-10-01' },
+      { id: 105, title: 'Integrate Micrometer Prometheus Metrics', category: 'Backend', priority: 'MEDIUM', status: 'PENDING', assignee: 'Dev Team', estimatedHours: 5, createdAt: '2026-10-01' }
+    ];
+
+    const initialLogs = [
+      `[2026-10-01 14:15:02.102] INFO  1 --- [main] c.e.fullstack.JavaFullstackApplication  : Starting JavaFullstackApplication v1.0.0 using Java 21.0.2...`,
+      `[2026-10-01 14:15:02.845] INFO  1 --- [main] o.s.b.w.embedded.tomcat.TomcatWebServer : Tomcat initialized with port(s): 8080 (http)`,
+      `[2026-10-01 14:15:03.110] INFO  1 --- [main] o.hibernate.jpa.internal.util.LogHelper : HHH000204: Processing PersistenceUnitInfo [name: default]`,
+      `[2026-10-01 14:15:03.890] INFO  1 --- [main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed. Connected to H2 in-memory database.`,
+      `[2026-10-01 14:15:04.220] INFO  1 --- [main] c.e.fullstack.JavaFullstackApplication  : Started JavaFullstackApplication in 2.341 seconds (JVM running for 2.89)`
+    ];
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [tasks, setTasks] = useState(initialTasks);
+      const [logs, setLogs] = useState(initialLogs);
+      const [serverOnline, setServerOnline] = useState(true);
+      const [filterCategory, setFilterCategory] = useState('ALL');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [toast, setToast] = useState(null);
+
+      const [apiMethod, setApiMethod] = useState('GET');
+      const [apiPath, setApiPath] = useState('/api/v1/tasks');
+      const [apiRequestBody, setApiRequestBody] = useState('{\n  "title": "New Spring Boot Microservice",\n  "category": "Backend",\n  "priority": "HIGH",\n  "estimatedHours": 10\n}');
+      const [apiResponse, setApiResponse] = useState(null);
+      const [apiLatency, setApiLatency] = useState(null);
+
+      const [sqlQuery, setSqlQuery] = useState('SELECT * FROM task_entity WHERE status = \'IN_PROGRESS\';');
+      const [sqlResult, setSqlResult] = useState(null);
+
+      const [newTask, setNewTask] = useState({
+        title: '',
+        category: 'Backend',
+        priority: 'MEDIUM',
+        status: 'PENDING',
+        assignee: 'Java Developer',
+        estimatedHours: 4
+      });
+
+      const [activeCodeFile, setActiveCodeFile] = useState('controller');
+      const logEndRef = useRef(null);
+
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3500);
+      };
+
+      const addServerLog = (msg) => {
+        const time = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        const formattedLog = `[${time}.0${Math.floor(Math.random()*900+100)}] INFO  1 --- [http-nio-8080-exec-${Math.floor(Math.random()*5+1)}] ${msg}`;
+        setLogs(prev => [...prev, formattedLog]);
+      };
+
+      const handleDownloadIndexHtml = () => {
+        const htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'index.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Downloaded index.html successfully!');
+      };
+
+      const handleCreateTask = (e) => {
+        e.preventDefault();
+        if (!newTask.title.trim()) return;
+
+        if (!serverOnline) {
+          showToast('Failed: Spring Boot server is offline!', 'error');
+          return;
+        }
+
+        const created = {
+          ...newTask,
+          id: Math.floor(Math.random() * 9000) + 1000,
+          createdAt: new Date().toISOString().split('T')[0]
+        };
+
+        setTasks([created, ...tasks]);
+        addServerLog(`c.e.fullstack.controller.TaskController : POST /api/v1/tasks - 201 Created (ID: ${created.id})`);
+        addServerLog(`org.hibernate.SQL                        : insert into task_entity (category, title, priority, status) values ('${created.category}', '${created.title}', '${created.priority}', '${created.status}')`);
+        
+        setIsModalOpen(false);
+        setNewTask({ title: '', category: 'Backend', priority: 'MEDIUM', status: 'PENDING', assignee: 'Java Developer', estimatedHours: 4 });
+        showToast(`Task #${created.id} created via JPA Repository!`);
+      };
+
+      const handleUpdateTaskStatus = (id, newStatus) => {
+        if (!serverOnline) {
+          showToast('Server offline!', 'error');
+          return;
+        }
+        setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
+        addServerLog(`c.e.fullstack.service.TaskService       : Updated Task #${id} status to ${newStatus}`);
+        showToast(`Updated Task #${id} status to ${newStatus}`);
+      };
+
+      const handleDeleteTask = (id) => {
+        if (!serverOnline) {
+          showToast('Server offline!', 'error');
+          return;
+        }
+        setTasks(tasks.filter(t => t.id !== id));
+        addServerLog(`c.e.fullstack.controller.TaskController : DELETE /api/v1/tasks/${id} - 204 No Content`);
+        showToast(`Deleted Task #${id} from database`);
+      };
+
+      const handleExecuteApi = () => {
+        if (!serverOnline) {
+          setApiResponse({ status: 503, statusText: 'Service Unavailable', data: { error: 'Spring Boot Application is offline.' } });
+          setApiLatency(12);
+          return;
+        }
+
+        const start = performance.now();
+
+        setTimeout(() => {
+          const latency = Math.floor(performance.now() - start + Math.random() * 25 + 15);
+          setApiLatency(latency);
+
+          if (apiPath.startsWith('/api/v1/tasks')) {
+            if (apiMethod === 'GET') {
+              setApiResponse({ status: 200, statusText: 'OK', headers: { 'Content-Type': 'application/json', 'X-Powered-By': 'Spring Boot 3.2' }, data: tasks });
+              addServerLog(`c.e.fullstack.controller.TaskController : GET /api/v1/tasks returned ${tasks.length} items [${latency}ms]`);
+            } else if (apiMethod === 'POST') {
+              try {
+                const parsed = JSON.parse(apiRequestBody);
+                const newTaskObj = { id: Math.floor(Math.random() * 8000) + 2000, ...parsed, status: 'PENDING', createdAt: '2026-10-01' };
+                setTasks([newTaskObj, ...tasks]);
+                setApiResponse({ status: 201, statusText: 'Created', headers: { 'Location': `/api/v1/tasks/${newTaskObj.id}` }, data: newTaskObj });
+                addServerLog(`c.e.fullstack.controller.TaskController : POST /api/v1/tasks created entity #${newTaskObj.id}`);
+              } catch (err) {
+                setApiResponse({ status: 400, statusText: 'Bad Request', data: { error: 'Invalid JSON payload structure' } });
+              }
+            } else if (apiMethod === 'DELETE') {
+              setApiResponse({ status: 204, statusText: 'No Content', data: null });
+              addServerLog(`c.e.fullstack.controller.TaskController : DELETE ${apiPath} completed successfully`);
+            }
+          } else if (apiPath === '/api/v1/health') {
+            setApiResponse({ status: 200, statusText: 'OK', data: { status: 'UP', components: { db: { status: 'UP', database: 'H2' }, diskSpace: { status: 'UP', free: '45GB' } } } });
+            addServerLog(`o.s.b.a.e.web.EndpointLinksResolver     : GET /api/v1/health status checked`);
+          } else {
+            setApiResponse({ status: 404, statusText: 'Not Found', data: { timestamp: new Date().toISOString(), status: 404, error: 'Not Found', path: apiPath } });
+          }
+        }, 120);
+      };
+
+      const handleExecuteSql = () => {
+        addServerLog(`org.hibernate.SQL                        : ${sqlQuery}`);
+        const trimmed = sqlQuery.trim().toUpperCase();
+        if (trimmed.startsWith('SELECT')) {
+          setSqlResult({
+            columns: ['id', 'title', 'category', 'priority', 'status', 'assignee'],
+            rows: tasks.map(t => [t.id, t.title, t.category, t.priority, t.status, t.assignee])
+          });
+        } else if (trimmed.startsWith('UPDATE') || trimmed.startsWith('INSERT') || trimmed.startsWith('DELETE')) {
+          setSqlResult({ message: 'Query executed successfully. 1 row affected.' });
+        } else {
+          setSqlResult({ error: 'SQL Syntax Error or command not supported in demo memory console.' });
+        }
+      };
+
+      const filteredTasks = tasks.filter(t => {
+        const matchesCategory = filterCategory === 'ALL' || t.category === filterCategory;
+        const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || t.assignee.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCategory && matchesSearch;
+      });
+
+      return (
+        <div className="flex flex-col h-screen overflow-hidden bg-slate-950 text-slate-100">
+          
+          {}
+          <header className="border-b border-slate-800 bg-slate-900/90 px-6 py-3 flex flex-wrap items-center justify-between gap-4 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 via-amber-500 to-emerald-500 flex items-center justify-center text-slate-950 font-bold text-xl shadow-lg shadow-orange-500/20">
+                <i className="fa-brands fa-java"></i>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="font-extrabold text-lg tracking-tight text-white">Java Spring Fullstack Engine</h1>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">v3.2.0 Spring Boot</span>
+                </div>
+                <p className="text-xs text-slate-400">Spring Data JPA + REST Controllers + React Frontend Suite</p>
+              </div>
+            </div>
+
+            {/* Server Controls & Download Action */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDownloadIndexHtml}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
+                title="Download single-file index.html"
+              >
+                <i className="fa-solid fa-download"></i>
+                <span>Download index.html</span>
+              </button>
+
+              <button 
+                onClick={() => {
+                  const nextState = !serverOnline;
+                  setServerOnline(nextState);
+                  addServerLog(nextState ? 'Spring Boot embedded Tomcat restarted on port 8080' : 'Spring Boot context shut down gracefully');
+                  showToast(nextState ? 'Spring Server Active' : 'Spring Server Stopped', nextState ? 'success' : 'error');
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+                  serverOnline 
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30' 
+                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${serverOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`}></span>
+                {serverOnline ? 'Server Active' : 'Server Stopped'}
+              </button>
+            </div>
+          </header>
+
+          {}
+          <div className="bg-slate-900/50 border-b border-slate-800 px-6 flex items-center gap-1 overflow-x-auto text-sm shrink-0">
+            {[
+              { id: 'dashboard', label: 'React Task Dashboard', icon: 'fa-solid fa-gauge-high' },
+              { id: 'api-tester', label: 'REST API Inspector', icon: 'fa-solid fa-network-wired' },
+              { id: 'db-console', label: 'JPA / H2 SQL Console', icon: 'fa-solid fa-database' },
+              { id: 'logs', label: 'Spring Boot Terminal', icon: 'fa-solid fa-terminal' },
+              { id: 'code', label: 'Backend Architecture & Code', icon: 'fa-solid fa-code' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-3 font-medium flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'border-emerald-500 text-emerald-400 bg-slate-800/40'
+                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
+                }`}
+              >
+                <i className={tab.icon}></i>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {}
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-950">
+
+            {/* TAB 1: REACT TASK DASHBOARD */}
+            {activeTab === 'dashboard' && (
+              <div className="space-y-6 max-w-7xl mx-auto">
+                
+                {/* Stats Summary Panel */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="glass-panel p-4 rounded-xl border border-slate-800 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl">
+                      <i className="fa-solid fa-list-check"></i>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">Total Managed Tasks</p>
+                      <h3 className="text-2xl font-bold text-white mt-0.5">{tasks.length}</h3>
+                    </div>
+                  </div>
+
+                  <div className="glass-panel p-4 rounded-xl border border-slate-800 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center text-xl">
+                      <i className="fa-solid fa-spinner animate-spin"></i>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">In Progress</p>
+                      <h3 className="text-2xl font-bold text-white mt-0.5">
+                        {tasks.filter(t => t.status === 'IN_PROGRESS').length}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="glass-panel p-4 rounded-xl border border-slate-800 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl">
+                      <i className="fa-solid fa-clock"></i>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">Est. Backend Hours</p>
+                      <h3 className="text-2xl font-bold text-white mt-0.5">
+                        {tasks.reduce((acc, t) => acc + (Number(t.estimatedHours) || 0), 0)} hrs
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="glass-panel p-4 rounded-xl border border-slate-800 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center text-xl">
+                      <i className="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">Completed</p>
+                      <h3 className="text-2xl font-bold text-white mt-0.5">
+                        {tasks.filter(t => t.status === 'COMPLETED').length}
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter and Create Controls */}
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4 glass-panel p-4 rounded-xl">
+                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-64">
+                      <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                      <input
+                        type="text"
+                        placeholder="Filter by title or assignee..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700/60 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400 font-medium">Category:</span>
+                      {['ALL', 'Backend', 'Frontend', 'Database', 'DevOps'].map(cat => (
+                        <button
+                          key={cat}
+                          onClick={() => setFilterCategory(cat)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            filterCategory === cat
+                              ? 'bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20'
+                              : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="w-full md:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+                  >
+                    <i className="fa-solid fa-plus"></i>
+                    New Task (Spring JPA)
+                  </button>
+                </div>
+
+                {}
+                <div className="glass-panel rounded-xl overflow-hidden border border-slate-800">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800 text-xs uppercase tracking-wider">
+                        <tr>
+                          <th className="px-6 py-3">Task ID</th>
+                          <th className="px-6 py-3">Task Title</th>
+                          <th className="px-6 py-3">Category</th>
+                          <th className="px-6 py-3">Priority</th>
+                          <th className="px-6 py-3">Status</th>
+                          <th className="px-6 py-3">Assignee</th>
+                          <th className="px-6 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {filteredTasks.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" className="px-6 py-8 text-center text-slate-500">
+                              No tasks matched your query.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredTasks.map(t => (
+                            <tr key={t.id} className="hover:bg-slate-900/40 transition-colors">
+                              <td className="px-6 py-4 font-mono text-xs text-slate-400">#{t.id}</td>
+                              <td className="px-6 py-4 font-semibold text-slate-100">{t.title}</td>
+                              <td className="px-6 py-4">
+                                <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                                  {t.category}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                                  t.priority === 'HIGH' 
+                                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
+                                    : t.priority === 'MEDIUM' 
+                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                                }`}>
+                                  {t.priority}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <select
+                                  value={t.status}
+                                  onChange={(e) => handleUpdateTaskStatus(t.id, e.target.value)}
+                                  className="bg-slate-900 border border-slate-700 text-xs rounded-md px-2 py-1 text-slate-200 focus:outline-none focus:border-emerald-500"
+                                >
+                                  <option value="PENDING">PENDING</option>
+                                  <option value="IN_PROGRESS">IN_PROGRESS</option>
+                                  <option value="COMPLETED">COMPLETED</option>
+                                </select>
+                              </td>
+                              <td className="px-6 py-4 text-slate-400 text-xs flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] text-slate-300 font-bold">
+                                  {t.assignee.substring(0, 2).toUpperCase()}
+                                </div>
+                                {t.assignee}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <button
+                                  onClick={() => handleDeleteTask(t.id)}
+                                  className="text-slate-500 hover:text-rose-400 p-1.5 transition-colors"
+                                  title="Delete Task"
+                                >
+                                  <i className="fa-solid fa-trash-can"></i>
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: REST API INSPECTOR */}
+            {activeTab === 'api-tester' && (
+              <div className="max-w-6xl mx-auto space-y-6">
+                <div className="glass-panel p-6 rounded-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-100">Spring REST Endpoint Tester</h2>
+                      <p className="text-xs text-slate-400">Interactively test embedded `@RestController` routes in real-time.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400 font-mono">Base URL:</span>
+                      <span className="text-xs bg-slate-900 px-2 py-1 rounded text-emerald-400 font-mono border border-slate-800">http://localhost:8080</span>
+                    </div>
+                  </div>
+
+                  {/* URL Input Bar */}
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={apiMethod}
+                      onChange={(e) => setApiMethod(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 text-sm font-bold rounded-lg px-3 py-2.5 text-emerald-400 focus:outline-none"
+                    >
+                      <option value="GET">GET</option>
+                      <option value="POST">POST</option>
+                      <option value="DELETE">DELETE</option>
+                    </select>
+
+                    <input
+                      type="text"
+                      value={apiPath}
+                      onChange={(e) => setApiPath(e.target.value)}
+                      className="flex-1 bg-slate-900 border border-slate-700/80 rounded-lg px-4 py-2.5 font-mono text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                    />
+
+                    <button
+                      onClick={handleExecuteApi}
+                      className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+                    >
+                      <i className="fa-solid fa-paper-plane"></i>
+                      Send
+                    </button>
+                  </div>
+
+                  {/* Endpoint Shortcuts */}
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-500 font-medium">Quick Routes:</span>
+                    <button onClick={() => { setApiMethod('GET'); setApiPath('/api/v1/tasks'); }} className="text-sky-400 hover:underline font-mono">GET /api/v1/tasks</button>
+                    <span className="text-slate-700">•</span>
+                    <button onClick={() => { setApiMethod('POST'); setApiPath('/api/v1/tasks'); }} className="text-sky-400 hover:underline font-mono">POST /api/v1/tasks</button>
+                    <span className="text-slate-700">•</span>
+                    <button onClick={() => { setApiMethod('GET'); setApiPath('/api/v1/health'); }} className="text-sky-400 hover:underline font-mono">GET /api/v1/health</button>
+                  </div>
+
+                  {apiMethod === 'POST' && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-slate-400">Request JSON Body:</label>
+                      <textarea
+                        value={apiRequestBody}
+                        onChange={(e) => setApiRequestBody(e.target.value)}
+                        rows="4"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 font-mono text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                      ></textarea>
+                    </div>
+                  )}
+                </div>
+
+                {/* Response Output Container */}
+                {apiResponse && (
+                  <div className="glass-panel p-6 rounded-xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-semibold text-slate-400">Response Status:</span>
+                        <span className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold ${
+                          apiResponse.status >= 200 && apiResponse.status < 300 
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        }`}>
+                          {apiResponse.status} {apiResponse.statusText}
+                        </span>
+                      </div>
+                      {apiLatency && (
+                        <span className="text-xs font-mono text-slate-400">
+                          Latency: <strong className="text-emerald-400">{apiLatency} ms</strong>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-slate-400">Response Payload:</p>
+                      <pre className="bg-slate-900 border border-slate-800 rounded-lg p-4 font-mono text-xs text-emerald-300 overflow-x-auto max-h-96">
+                        {JSON.stringify(apiResponse.data, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: JPA / H2 DATABASE CONSOLE */}
+            {activeTab === 'db-console' && (
+              <div className="max-w-6xl mx-auto space-y-6">
+                <div className="glass-panel p-6 rounded-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-3">
+                      <i className="fa-solid fa-database text-amber-500 text-xl"></i>
+                      <div>
+                        <h2 className="text-base font-bold text-slate-100">H2 In-Memory Database Console</h2>
+                        <p className="text-xs text-slate-400">JDBC URL: <code className="text-amber-400 font-mono">jdbc:h2:mem:testdb</code></p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                      Driver: org.h2.Driver
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-slate-400">SQL Query Editor:</label>
+                    <div className="relative">
+                      <textarea
+                        value={sqlQuery}
+                        onChange={(e) => setSqlQuery(e.target.value)}
+                        rows="3"
+                        className="w-full bg-slate-900 border border-slate-700/80 rounded-lg p-3 font-mono text-xs text-amber-300 focus:outline-none focus:border-amber-500"
+                      ></textarea>
+                      <button
+                        onClick={handleExecuteSql}
+                        className="absolute right-3 bottom-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-1.5 rounded text-xs flex items-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+                      >
+                        <i className="fa-solid fa-play"></i>
+                        Execute SQL
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {sqlResult && (
+                  <div className="glass-panel p-6 rounded-xl space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Query Execution Output</h3>
+                    {sqlResult.error ? (
+                      <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-300 text-xs font-mono">
+                        {sqlResult.error}
+                      </div>
+                    ) : sqlResult.message ? (
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-300 text-xs font-mono">
+                        {sqlResult.message}
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border border-slate-800">
+                        <table className="w-full text-left text-xs font-mono">
+                          <thead className="bg-slate-900 text-slate-400 border-b border-slate-800">
+                            <tr>
+                              {sqlResult.columns.map((col, idx) => (
+                                <th key={idx} className="px-4 py-2 border-r border-slate-800">{col}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/60 bg-slate-950">
+                            {sqlResult.rows.map((row, rIdx) => (
+                              <tr key={rIdx} className="hover:bg-slate-900/40">
+                                {row.map((val, cIdx) => (
+                                  <td key={cIdx} className="px-4 py-2 text-slate-300 border-r border-slate-800/40">{String(val)}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {}
+            {activeTab === 'logs' && (
+              <div className="max-w-6xl mx-auto space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <h2 className="text-sm font-bold text-slate-200 font-mono">Spring Boot Live Console Output</h2>
+                  </div>
+                  <button
+                    onClick={() => setLogs([])}
+                    className="text-xs px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700"
+                  >
+                    Clear Terminal
+                  </button>
+                </div>
+
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-300 h-[500px] overflow-y-auto space-y-1.5 shadow-inner">
+                  {logs.map((log, index) => (
+                    <div key={index} className="leading-relaxed hover:bg-slate-900/60 rounded px-1">
+                      {log.includes('INFO') ? (
+                        <span className="text-sky-400">{log}</span>
+                      ) : log.includes('SQL') ? (
+                        <span className="text-amber-400">{log}</span>
+                      ) : log.includes('ERROR') ? (
+                        <span className="text-rose-400">{log}</span>
+                      ) : (
+                        <span className="text-slate-300">{log}</span>
+                      )}
+                    </div>
+                  ))}
+                  <div ref={logEndRef} />
+                </div>
+              </div>
+            )}
+
+            {}
+            {activeTab === 'code' && (
+              <div className="max-w-6xl mx-auto space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-100">Java Spring Boot + React Source Code</h2>
+                    <p className="text-xs text-slate-400">Inspect Java annotations, REST Controllers, and JPA Repositories driving this application.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {[
+                      { id: 'controller', label: 'TaskController.java' },
+                      { id: 'service', label: 'TaskService.java' },
+                      { id: 'entity', label: 'TaskEntity.java' },
+                      { id: 'repository', label: 'TaskRepository.java' }
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setActiveCodeFile(f.id)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-mono transition-all ${
+                          activeCodeFile === f.id
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
+                            : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="glass-panel rounded-xl overflow-hidden border border-slate-800">
+                  <pre className="p-6 font-mono text-xs text-slate-200 overflow-x-auto leading-relaxed bg-slate-950">
+                    {activeCodeFile === 'controller' && `package com.example.fullstack.controller;
+
+import com.example.fullstack.entity.TaskEntity;
+import com.example.fullstack.service.TaskService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/tasks")
+@CrossOrigin(origins = "*")
+public class TaskController {
+
+    private final TaskService taskService;
+
+    public TaskController(TaskService taskService) {
+        this.taskService = taskService;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<TaskEntity>> getAllTasks() {
+        return ResponseEntity.ok(taskService.findAllTasks());
+    }
+
+    @PostMapping
+    public ResponseEntity<TaskEntity> createTask(@RequestBody TaskEntity task) {
+        TaskEntity created = taskService.saveTask(task);
+        return new ResponseEntity<>(created, HttpStatus.CREATED);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
+        taskService.deleteTaskById(id);
+        return ResponseEntity.noContent().build();
+    }
+}`}
+
+                    {activeCodeFile === 'service' && `package com.example.fullstack.service;
+
+import com.example.fullstack.entity.TaskEntity;
+import com.example.fullstack.repository.TaskRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+@Transactional
+public class TaskService {
+
+    private final TaskRepository taskRepository;
+
+    public TaskService(TaskRepository taskRepository) {
+        this.taskRepository = taskRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskEntity> findAllTasks() {
+        return taskRepository.findAllByOrderByIdDesc();
+    }
+
+    public TaskEntity saveTask(TaskEntity task) {
+        return taskRepository.save(task);
+    }
+
+    public void deleteTaskById(Long id) {
+        taskRepository.deleteById(id);
+    }
+}`}
+
+                    {activeCodeFile === 'entity' && `package com.example.fullstack.entity;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "task_entity")
+public class TaskEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String title;
+
+    private String category;
+    
+    @Enumerated(EnumType.STRING)
+    private Priority priority;
+
+    @Enumerated(EnumType.STRING)
+    private Status status;
+
+    private String assignee;
+    private Integer estimatedHours;
+
+    public enum Priority { LOW, MEDIUM, HIGH }
+    public enum Status { PENDING, IN_PROGRESS, COMPLETED }
+}`}
+
+                    {activeCodeFile === 'repository' && `package com.example.fullstack.repository;
+
+import com.example.fullstack.entity.TaskEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface TaskRepository extends JpaRepository<TaskEntity, Long> {
+    
+    List<TaskEntity> findAllByOrderByIdDesc();
+    List<TaskEntity> findByStatus(TaskEntity.Status status);
+}`}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {}
+          {isModalOpen && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="glass-panel w-full max-w-md rounded-xl p-6 border border-slate-800 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-base font-bold text-slate-100">Create Task (Post via Spring API)</h3>
+                  <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-200">
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateTask} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-medium">Task Title:</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g., Implement Spring Security Filter"
+                      value={newTask.title}
+                      onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Category:</label>
+                      <select
+                        value={newTask.category}
+                        onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="Backend">Backend</option>
+                        <option value="Frontend">Frontend</option>
+                        <option value="Database">Database</option>
+                        <option value="DevOps">DevOps</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Priority:</label>
+                      <select
+                        value={newTask.priority}
+                        onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="LOW">LOW</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="HIGH">HIGH</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Assignee:</label>
+                      <input
+                        type="text"
+                        value={newTask.assignee}
+                        onChange={(e) => setNewTask({ ...newTask, assignee: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Est. Hours:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={newTask.estimatedHours}
+                        onChange={(e) => setNewTask({ ...newTask, estimatedHours: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-lg bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 shadow-lg shadow-emerald-500/20"
+                    >
+                      Persist Task
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {}
+          {toast && (
+            <div className={`fixed bottom-6 right-6 px-4 py-3 rounded-lg shadow-2xl border text-xs font-semibold flex items-center gap-2 animate-bounce z-50 ${
+              toast.type === 'error' 
+                ? 'bg-rose-950 text-rose-200 border-rose-500/40' 
+                : 'bg-emerald-950 text-emerald-200 border-emerald-500/40'
+            }`}>
+              <i className={`fa-solid ${toast.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}`}></i>
+              {toast.message}
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
